@@ -1,1 +1,70 @@
 #hello,this is a map using pyecharts to draw out the distibution of paitients in China
+import requests
+from bs4 import BeautifulSoup
+from io import BytesIO
+import gzip
+import json
+from pyecharts import options as opts
+from pyecharts.charts import Map
+def get_data():
+    r=requests.get('https://3g.dxy.cn/newh5/view/pneumonia_peopleapp?from=timeline&isappinstalled=0')
+    r.encoding=r.apparent_encoding
+    soup=BeautifulSoup(r.text,'lxml')
+
+    area=soup.select('#getAreaStat')
+    try1=area[0].text
+    # try1
+    json1=try1.rstrip('}catch(e){}').lstrip('try { window.getAreaStat =')
+    lst=json.loads(json1)
+
+    lst
+    '''
+    lst[0]={'cities'=[],
+    'comment': '待明确地区：治愈 22',
+      'confirmedCount': 5806,
+      'curedCount': 141,
+      'deadCount': 204,
+      'provinceName': '湖北省',
+      'provinceShortName': '湖北',
+      'suspectedCount': 0}
+    ''' 
+    dic={}
+    for i in lst:
+        dic[i['provinceName']]=i['confirmedCount']
+    #dic没处理
+
+    #做地图
+    list1=[]
+    for title,num in dic.items():
+        li=[]
+        if title.endswith('自治区'):
+            title=title[:2]
+        if title.startswith('内蒙'):
+            title='内蒙古'
+        title=title.replace('省','').replace('市','')
+        li.append(title)
+        li.append(num)
+        list1.append(li)
+    #list1地名和数量
+    return list1
+
+def map_base(list1) -> Map:
+    c = Map()
+        
+    c.add("", list1, "china")
+    c.set_series_opts(label_opts=opts.LabelOpts(is_show=True))#显示label
+    c.set_global_opts(title_opts=opts.TitleOpts(title="2019-nCoV地图"),
+                        visualmap_opts=opts.VisualMapOpts(is_piecewise=True,
+                        pieces=[
+       {"min": 1000,'label':'>1000','color':'#660000'}, 
+       {"min": 500, "max": 1000,'color':'#CC0000'},
+       {"min": 100, "max": 499,'color':'#FF0000'},
+       {"min": 10, "max": 99,'color':'#FF8888'},
+       {"min": 1, "max": 9,'color':'#FFDDDD'}],
+               range_color=''                                           
+                )#连续型，分段
+    )
+    return c
+if __name__ == '__main__':
+    c=map_base(get_data())
+    c.render(path='./地图.html')
